@@ -390,12 +390,74 @@ class Dialog(Widget):
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
         w, h = 50, 8
         x, y = (max_x - w) // 2, (max_y - h) // 2
+        for i in range(h):
+            try: stdscr.addstr(y + i, x, " " * w, curses.color_pair(1))
+            except curses.error: pass
         Frame(self.title, x, y, w, h, color_pair=4).render(stdscr, max_y, max_x)
         Label(self.message.center(w - 4), x + 2, y + 2, width=w - 4).render(stdscr, max_y, max_x)
         self.yes_btn.x, self.yes_btn.y = x + 10, y + 5
         self.no_btn.x, self.no_btn.y = x + 30, y + 5
         self.yes_btn.render(stdscr, max_y, max_x)
         self.no_btn.render(stdscr, max_y, max_x)
+
+class FormDialog(Widget):
+    def __init__(self, title: str, fields: list[tuple[str, Widget]], on_save: callable, on_cancel: callable):
+        super().__init__()
+        self.title = title
+        self.fields = fields
+        self.on_save = on_save
+        self.on_cancel = on_cancel
+        self.focused_field_idx = 0
+        self.save_btn = Button("SAVE", on_click=on_save)
+        self.cancel_btn = Button("CANCEL", on_click=on_cancel)
+        self.save_btn.focused = False
+        self.cancel_btn.focused = False
+
+    def handle_event(self, event: object) -> bool:
+        if event.type != 'key': return False
+        key = event.data['code']
+        num_fields = len(self.fields)
+        
+        if key in [ord('\t'), curses.KEY_DOWN, ord('j')]:
+            self.focused_field_idx = (self.focused_field_idx + 1) % (num_fields + 2)
+            self._update_focus()
+            return True
+        elif key in [curses.KEY_BTAB, curses.KEY_UP, ord('k')]:
+            self.focused_field_idx = (self.focused_field_idx - 1 + num_fields + 2) % (num_fields + 2)
+            self._update_focus()
+            return True
+            
+        if self.focused_field_idx < num_fields:
+            if self.fields[self.focused_field_idx][1].handle_event(event): return True
+        elif self.focused_field_idx == num_fields:
+            if self.save_btn.handle_event(event): return True
+        else:
+            if self.cancel_btn.handle_event(event): return True
+        return True
+
+    def _update_focus(self) -> None:
+        num_fields = len(self.fields)
+        for i, (_, w) in enumerate(self.fields):
+            w.focused = (i == self.focused_field_idx)
+        self.save_btn.focused = (self.focused_field_idx == num_fields)
+        self.cancel_btn.focused = (self.focused_field_idx == num_fields + 1)
+
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+        w, h = 70, len(self.fields) + 10
+        x, y = (max_x - w) // 2, (max_y - h) // 2
+        for i in range(h):
+            try: stdscr.addstr(y + i, x, " " * w, curses.color_pair(1))
+            except curses.error: pass
+        Frame(self.title, x, y, w, h, color_pair=2).render(stdscr, max_y, max_x)
+        for i, (label, widget) in enumerate(self.fields):
+            Label(f"{label}:", x + 4, y + 3 + i).render(stdscr, max_y, max_x)
+            widget.x, widget.y = x + 25, y + 3 + i
+            widget.width = w - 30
+            widget.render(stdscr, max_y, max_x)
+        self.save_btn.x, self.save_btn.y = x + 15, y + h - 3
+        self.cancel_btn.x, self.cancel_btn.y = x + 40, y + h - 3
+        self.save_btn.render(stdscr, max_y, max_x)
+        self.cancel_btn.render(stdscr, max_y, max_x)
 
 class LogDisplay(Widget):
     def __init__(self, x: int = 0, y: int = 0, width: int = 50, height: int = 10, color_pair: int = 1):
