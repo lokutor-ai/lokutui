@@ -254,15 +254,18 @@ class Select(Widget):
         if not self.focused or event.type != 'key' or not self.options:
             return False
         key = event.data['code']
-        if key == curses.KEY_LEFT:
+        if key == curses.KEY_LEFT or key == ord('h'):
             self.selected_idx = (self.selected_idx - 1 + len(self.options)) % len(self.options)
-            if self.on_change: self.on_change(self.options[self.selected_idx])
+            if self.on_change:
+                self.on_change(self.options[self.selected_idx])
             return True
-        elif key == curses.KEY_RIGHT or key == ord(' ') or key == ord('\n') or key == ord('\r'):
+        elif key == curses.KEY_RIGHT or key == ord('l') or key == ord(' ') or key == ord('\n') or key == ord('\r'):
             self.selected_idx = (self.selected_idx + 1) % len(self.options)
-            if self.on_change: self.on_change(self.options[self.selected_idx])
+            if self.on_change:
+                self.on_change(self.options[self.selected_idx])
             return True
         return False
+    
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
         if not self.visible or self.width < 1:
@@ -367,6 +370,39 @@ class Frame(Box):
         try:
             stdscr.addstr(self.y, self.x + 2, display_title, curses.color_pair(self.color_pair))
         except curses.error: pass
+
+class Dialog(Widget):
+    def __init__(self, title: str, message: str, on_yes: callable, on_no: callable):
+        super().__init__()
+        self.title = title
+        self.message = message
+        self.on_yes = on_yes
+        self.on_no = on_no
+        self.yes_btn = Button("YES", on_click=on_yes)
+        self.no_btn = Button("NO", on_click=on_no)
+        self.yes_btn.focused = True
+        self.no_btn.focused = False
+
+    def handle_event(self, event: object) -> bool:
+        if event.type != 'key': return False
+        key = event.data['code']
+        if key in [ord('\t'), curses.KEY_BTAB, ord('h'), ord('l'), curses.KEY_LEFT, curses.KEY_RIGHT]:
+            self.yes_btn.focused = not self.yes_btn.focused
+            self.no_btn.focused = not self.no_btn.focused
+            return True
+        if self.yes_btn.focused and self.yes_btn.handle_event(event): return True
+        if self.no_btn.focused and self.no_btn.handle_event(event): return True
+        return True
+
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+        w, h = 50, 8
+        x, y = (max_x - w) // 2, (max_y - h) // 2
+        Frame(self.title, x, y, w, h, color_pair=4).render(stdscr, max_y, max_x)
+        Label(self.message.center(w - 4), x + 2, y + 2, width=w - 4).render(stdscr, max_y, max_x)
+        self.yes_btn.x, self.yes_btn.y = x + 10, y + 5
+        self.no_btn.x, self.no_btn.y = x + 30, y + 5
+        self.yes_btn.render(stdscr, max_y, max_x)
+        self.no_btn.render(stdscr, max_y, max_x)
 
 class LogDisplay(Widget):
     def __init__(self, x: int = 0, y: int = 0, width: int = 50, height: int = 10, color_pair: int = 1):
