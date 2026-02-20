@@ -1,0 +1,20 @@
+[project]
+name = "lokutui"
+version = "0.1.0"
+description = "A native python tui library"
+readme = "README.md"
+authors = [
+    { name = "Guillermo Martín-Coello", email = "guillermo.martincoello@gmail.com" },
+    { name = "Daniel Varela", email = "dvarelasanchez@gmail.com" },
+]
+requires-python = ">=3.13.2"
+dependencies = []
+license = { text = "MIT" }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.urls]
+Homepage = "https://github.com/lokutor-ai/lokutui"
+Repository = "https://github.com/lokutor-ai/lokutui"
