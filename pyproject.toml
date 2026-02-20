@@ -4,6 +4,7 @@ version = "0.1.2"
 description = "A native python tui library"
 readme = "README.md"
 authors = [
+    { name = "Lokutor", email = "contact@lokutor.com" },
     { name = "Guillermo Martín-Coello", email = "guillermo.martincoello@gmail.com" },
     { name = "Daniel Varela", email = "dvarelasanchez@gmail.com" },
 ]
