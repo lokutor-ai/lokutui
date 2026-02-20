@@ -12,6 +12,7 @@ class Screen:
         self.widgets: list[Widget] = []
         self.modal: Widget | None = None
         self.loading: bool = False
+        self.loading_message: str = "Loading..."
         self.should_exit: bool = False
         self.event_dispatcher = EventDispatcher()
         self._last_render_time: float = time.monotonic()
@@ -70,7 +71,7 @@ class Screen:
                 try: self.stdscr.addstr(ly + i, lx, " " * lw, curses.color_pair(1))
                 except curses.error: pass
             Frame(" SYSTEM ", lx, ly, lw, lh, color_pair=2).render(self.stdscr, max_y, max_x)
-            Label("PLEASE WAIT, FETCHING AWS DATA...".center(lw - 4), lx + 2, ly + 2, width=lw - 4, color_pair=3).render(self.stdscr, max_y, max_x)
+            Label(self.loading_message.center(lw - 4), lx + 2, ly + 2, width=lw - 4, color_pair=3).render(self.stdscr, max_y, max_x)
 
         if self.modal:
             self.modal.render(self.stdscr, max_y, max_x)
