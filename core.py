@@ -22,7 +22,7 @@ class Screen:
         curses.curs_set(0)
         curses.start_color()
         curses.use_default_colors()
-        curses.init_pair(1, curses.COLOR_WHITE, -1) # Use default background
+        curses.init_pair(1, curses.COLOR_WHITE, -1) 
         curses.init_pair(2, curses.COLOR_CYAN, -1)
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_YELLOW)
         curses.init_pair(4, curses.COLOR_RED, -1)
@@ -68,7 +68,7 @@ class Screen:
         self._init_curses_environment()
         try:
             if initial_setup_callback:
-                from lokutui.events import CustomEvent # Import CustomEvent here to avoid circular dependency
+                from lokutui.events import CustomEvent 
                 initial_setup_callback()
             
             while not self.should_exit:
@@ -83,7 +83,7 @@ class Screen:
                     self.event_dispatcher.dispatch(event)
                 
                 if time.monotonic() - self._last_render_time >= main_loop_interval:
-                    from lokutui.events import CustomEvent # Import CustomEvent here too if needed
+                    from lokutui.events import CustomEvent 
                     self.event_dispatcher.dispatch(CustomEvent('render_tick'))
                     self._render()
                 
