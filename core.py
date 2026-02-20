@@ -1,3 +1,4 @@
+from __future__ import annotations
 import curses
 import time
 from collections import deque
@@ -5,20 +6,19 @@ from lokutui.events import EventDispatcher, create_key_event, _global_event_queu
 
 
 class Screen:
-    """Manages the curses screen, handling initialization, rendering, and input."""
     def __init__(self):
-        self.stdscr = None
-        self.widgets = []
-        self.should_exit = False
+        self.stdscr: object = None
+        self.widgets: list[Widget] = []
+        self.should_exit: bool = False
         self.event_dispatcher = EventDispatcher()
-        self._last_render_time = time.monotonic()
+        self._last_render_time: float = time.monotonic()
 
-    def _init_curses_environment(self):
-        """Initializes the curses screen."""
+    def _init_curses_environment(self) -> None:
         self.stdscr = curses.initscr()
         curses.noecho()
         curses.cbreak()
         self.stdscr.keypad(True)
+        self.stdscr.nodelay(True)
         curses.curs_set(0)
         curses.start_color()
         curses.use_default_colors()
@@ -27,8 +27,7 @@ class Screen:
         curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_YELLOW)
         curses.init_pair(4, curses.COLOR_RED, -1)
 
-    def _destroy_curses_environment(self):
-        """Restores the terminal to its original state."""
+    def _destroy_curses_environment(self) -> None:
         if self.stdscr:
             curses.curs_set(1)
             self.stdscr.keypad(False)
@@ -36,26 +35,23 @@ class Screen:
             curses.nocbreak()
             curses.endwin()
 
-    def add_widget(self, widget):
-        """Adds a widget to the screen to be rendered."""
+    def add_widget(self, widget: Widget) -> None:
         self.widgets.append(widget)
 
-    def remove_widget(self, widget):
-        """Removes a widget from the screen."""
-        self.widgets.remove(widget)
+    def remove_widget(self, widget: Widget) -> None:
+        if widget in self.widgets:
+            self.widgets.remove(widget)
 
-    def _handle_input(self):
-        """Reads user input and posts it into the global event queue."""
+    def _handle_input(self) -> None:
         try:
             key = self.stdscr.getch()
             if key != -1:
                 char = chr(key) if 32 <= key <= 126 else None
                 self.event_dispatcher.post(create_key_event(key, char))
-        except curses.error:
+        except (curses.error, ValueError):
             pass
 
-    def _render(self):
-        """Renders all widgets to the screen."""
+    def _render(self) -> None:
         self.stdscr.erase()
         max_y, max_x = self.stdscr.getmaxyx()
         for widget in self.widgets:
@@ -63,12 +59,11 @@ class Screen:
         self.stdscr.refresh()
 
         self._last_render_time = time.monotonic()
-    def run(self, initial_setup_callback=None, main_loop_interval=0.016):
-        """Runs the main event and rendering loop."""
+
+    def run(self, initial_setup_callback: callable | None = None, main_loop_interval: float = 0.016) -> None:
         self._init_curses_environment()
         try:
             if initial_setup_callback:
-                from lokutui.events import CustomEvent 
                 initial_setup_callback()
             
             while not self.should_exit:
@@ -91,22 +86,22 @@ class Screen:
         finally:
             self._destroy_curses_environment()
 
-    def exit(self):
-        """Signals the application to exit."""
+    def exit(self) -> None:
         self.should_exit = True
 
 
 class Widget:
-    """Base class for all TUI widgets."""
-    def __init__(self, x=0, y=0, width=None, height=None):
+    def __init__(self, x: int = 0, y: int = 0, width: int | None = None, height: int | None = None):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
-        self.visible = True
+        self.visible: bool = True
         
-    def render(self, stdscr, max_y, max_x):
-        """Renders the widget to the given curses window."""
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
         if not self.visible:
             return
         pass
+
+    def handle_event(self, event: object) -> bool:
+        return False
