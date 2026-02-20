@@ -14,6 +14,7 @@ class Screen:
         self.should_exit: bool = False
         self.event_dispatcher = EventDispatcher()
         self._last_render_time: float = time.monotonic()
+        self.needs_render: bool = True
 
     def _init_curses_environment(self) -> None:
         self.stdscr = curses.initscr()
@@ -82,6 +83,7 @@ class Screen:
                 
                 while _global_event_queue:
                     event = _global_event_queue.popleft()
+                    self.needs_render = True
                     if event.type == 'key' and event.data['code'] in [ord('q'), ord('Q')]:
                         self.should_exit = True
                         break
@@ -91,10 +93,14 @@ class Screen:
                     
                     self.event_dispatcher.dispatch(event)
                 
-                if time.monotonic() - self._last_render_time >= main_loop_interval:
+                now = time.monotonic()
+                if now - self._last_render_time >= main_loop_interval:
                     from lokutui.events import CustomEvent 
                     self.event_dispatcher.dispatch(CustomEvent('render_tick'))
-                    self._render()
+                    if self.needs_render:
+                        self._render()
+                        self.needs_render = False
+                    self._last_render_time = now
                 
                 time.sleep(0.001)
         finally:
