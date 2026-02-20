@@ -9,6 +9,8 @@ class Screen:
     def __init__(self):
         self.stdscr: object = None
         self.widgets: list[Widget] = []
+        self.modal: Widget | None = None
+        self.loading: bool = False
         self.should_exit: bool = False
         self.event_dispatcher = EventDispatcher()
         self._last_render_time: float = time.monotonic()
@@ -56,8 +58,17 @@ class Screen:
         max_y, max_x = self.stdscr.getmaxyx()
         for widget in self.widgets:
             widget.render(self.stdscr, max_y, max_x)
-        self.stdscr.refresh()
+        
+        if self.loading:
+            from lokutui.widgets import Frame, Label
+            lw, lh = 40, 5
+            lx, ly = (max_x - lw) // 2, (max_y - lh) // 2
+            Frame(" SYSTEM ", lx, ly, lw, lh, color_pair=2).render(self.stdscr, max_y, max_x)
+            Label("PLEASE WAIT, FETCHING AWS DATA...".center(lw - 4), lx + 2, ly + 2, width=lw - 4, color_pair=3).render(self.stdscr, max_y, max_x)
 
+        if self.modal:
+            self.modal.render(self.stdscr, max_y, max_x)
+        self.stdscr.refresh()
         self._last_render_time = time.monotonic()
 
     def run(self, initial_setup_callback: callable | None = None, main_loop_interval: float = 0.016) -> None:
@@ -74,6 +85,9 @@ class Screen:
                     if event.type == 'key' and event.data['code'] in [ord('q'), ord('Q')]:
                         self.should_exit = True
                         break
+                    
+                    if self.modal and self.modal.handle_event(event):
+                        continue
                     
                     self.event_dispatcher.dispatch(event)
                 
