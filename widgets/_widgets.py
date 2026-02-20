@@ -64,11 +64,15 @@ class Box(Widget):
 class Button(Widget):
     def __init__(self, text: str, x: int = 0, y: int = 0, on_click: callable | None = None, color_pair: int = 1, highlight_color_pair: int = 2):
         super().__init__(x, y, width=len(text) + 4, height=1) 
-        self.text = f"  {text}  " 
+        self._label = text
         self.on_click = on_click
         self.color_pair = color_pair
         self.highlight_color_pair = highlight_color_pair
         self.focused: bool = False
+
+    @property
+    def text(self) -> str:
+        return self._label.center(self.width) if self.width else f"  {self._label}  "
 
     def handle_event(self, event: object) -> bool:
         if not self.focused or event.type != 'key':
@@ -84,18 +88,21 @@ class Button(Widget):
         if not self.visible:
             return
         display_text = self.text
-        effective_width = self.width if self.width is not None else len(display_text)
         render_y = min(self.y, max_y - 1)
         render_x = min(self.x, max_x - 1)
         if render_y < 0 or render_x < 0:
             return
-        if len(display_text) > effective_width:
-            display_text = display_text[:effective_width]
+        
         if len(display_text) > max_x - render_x:
             display_text = display_text[:max_x - render_x]
-        current_color = curses.color_pair(self.highlight_color_pair) if self.focused else curses.color_pair(self.color_pair)
+        
+        if self.focused:
+            attr = curses.color_pair(self.highlight_color_pair) | curses.A_BOLD | curses.A_REVERSE
+        else:
+            attr = curses.color_pair(self.color_pair)
+            
         try:
-            stdscr.addstr(render_y, render_x, display_text, current_color)
+            stdscr.addstr(render_y, render_x, display_text, attr)
         except curses.error: pass
 
 class TextInput(Widget):
@@ -134,10 +141,10 @@ class TextInput(Widget):
             if self._cursor_pos < len(self._text):
                 self._text = self._text[:self._cursor_pos] + self._text[self._cursor_pos + 1:]
             return True
-        elif key == curses.KEY_LEFT:
+        elif key == curses.KEY_LEFT or key == ord('h'):
             self._cursor_pos = max(0, self._cursor_pos - 1)
             return True
-        elif key == curses.KEY_RIGHT:
+        elif key == curses.KEY_RIGHT or key == ord('l'):
             self._cursor_pos = min(len(self._text), self._cursor_pos + 1)
             return True
         return False
@@ -156,10 +163,22 @@ class TextInput(Widget):
                 start_display_idx = self._cursor_pos - (self.width - 1)
             display_text = display_text[start_display_idx : start_display_idx + self.width]
         display_text = display_text.ljust(self.width)
-        current_color = curses.color_pair(self.highlight_color_pair) if self.focused else curses.color_pair(self.color_pair)
+        
+        if self.focused:
+            attr = curses.color_pair(self.highlight_color_pair) | curses.A_BOLD
+        else:
+            attr = curses.color_pair(self.color_pair)
+
         try:
-            stdscr.addstr(render_y, render_x, display_text, current_color)
-        except curses.error: pass
+            stdscr.addstr(render_y, render_x, display_text, attr)
+            if self.focused and render_y < max_y and render_x + (self._cursor_pos - start_display_idx) < max_x:
+                curses.curs_set(1) 
+                stdscr.move(render_y, render_x + (self._cursor_pos - start_display_idx))
+            else:
+                curses.curs_set(0) 
+        except curses.error:
+            curses.curs_set(0) 
+            pass
 
 class List(Widget):
     def __init__(self, items: list[str], x: int = 0, y: int = 0, width: int = 20, height: int = 5, color_pair: int = 1, highlight_color_pair: int = 3, on_select: callable | None = None):
@@ -176,12 +195,12 @@ class List(Widget):
         if not self.focused or event.type != 'key' or not self.items:
             return False
         key = event.data['code']
-        if key == curses.KEY_UP:
+        if key == curses.KEY_UP or key == ord('k'):
             self.selected_idx = max(0, self.selected_idx - 1)
             if self.selected_idx < self._scroll_offset:
                 self._scroll_offset = self.selected_idx
             return True
-        elif key == curses.KEY_DOWN:
+        elif key == curses.KEY_DOWN or key == ord('j'):
             self.selected_idx = min(len(self.items) - 1, self.selected_idx + 1)
             if self.selected_idx >= self._scroll_offset + self.height:
                 self._scroll_offset = self.selected_idx - self.height + 1
@@ -204,11 +223,20 @@ class List(Widget):
             if item_idx >= len(self.items):
                 break
             y_pos = render_y_start + i
-            display_text = str(self.items[item_idx]).ljust(actual_width)[:actual_width]
             is_selected = (item_idx == self.selected_idx)
-            color = curses.color_pair(self.highlight_color_pair) if (is_selected and self.focused) else curses.color_pair(self.color_pair)
+            
+            indicator = "> " if is_selected else "  "
+            display_text = (indicator + str(self.items[item_idx])).ljust(actual_width)[:actual_width]
+            
+            if is_selected and self.focused:
+                attr = curses.color_pair(self.highlight_color_pair) | curses.A_BOLD | curses.A_REVERSE
+            elif is_selected:
+                attr = curses.color_pair(self.color_pair) | curses.A_BOLD
+            else:
+                attr = curses.color_pair(self.color_pair)
+                
             try:
-                stdscr.addstr(y_pos, render_x_start, display_text, color)
+                stdscr.addstr(y_pos, render_x_start, display_text, attr)
             except curses.error: pass
 
 class Select(Widget):
