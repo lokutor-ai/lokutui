@@ -27,10 +27,8 @@ class Label(Widget):
         except curses.error: pass
 
 class Box(Widget):
-    def __init__(self, x: int = 0, y: int = 0, width: int = 10, height: int = 5, border_char: str = '─', corner_char: str = '+', color_pair: int = 1):
+    def __init__(self, x: int = 0, y: int = 0, width: int = 10, height: int = 5, color_pair: int = 1):
         super().__init__(x, y, width, height)
-        self.border_char = border_char
-        self.corner_char = corner_char
         self.color_pair = color_pair
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
@@ -38,27 +36,22 @@ class Box(Widget):
             return
         end_y = min(self.y + self.height - 1, max_y - 1)
         end_x = min(self.x + self.width - 1, max_x - 1)
-        actual_height = end_y - self.y + 1
-        actual_width = end_x - self.x + 1
-        if actual_width < 2 or actual_height < 2:
-            return
+        actual_h = end_y - self.y + 1
+        actual_w = end_x - self.x + 1
+        if actual_w < 2 or actual_h < 2: return
         pair = curses.color_pair(self.color_pair)
         try:
-            stdscr.addch(self.y, self.x, self.corner_char, pair)
-            for i in range(1, actual_width - 1):
-                stdscr.addch(self.y, self.x + i, self.border_char, pair)
-            if actual_width > 1: 
-                stdscr.addch(self.y, self.x + actual_width - 1, self.corner_char, pair)
-            for j in range(1, actual_height - 1):
-                stdscr.addch(self.y + j, self.x, '|', pair)
-                if actual_width > 1:
-                    stdscr.addch(self.y + j, self.x + actual_width - 1, '|', pair)
-            if actual_height > 1: 
-                stdscr.addch(self.y + actual_height - 1, self.x, self.corner_char, pair)
-                for i in range(1, actual_width - 1):
-                    stdscr.addch(self.y + actual_height - 1, self.x + i, self.border_char, pair)
-                if actual_width > 1:
-                    stdscr.addch(self.y + actual_height - 1, self.x + actual_width - 1, self.corner_char, pair)
+            stdscr.addch(self.y, self.x, '┌', pair)
+            for i in range(1, actual_w - 1):
+                stdscr.addch(self.y, self.x + i, '─', pair)
+            stdscr.addch(self.y, self.x + actual_w - 1, '┐', pair)
+            for j in range(1, actual_h - 1):
+                stdscr.addch(self.y + j, self.x, '│', pair)
+                stdscr.addch(self.y + j, self.x + actual_w - 1, '│', pair)
+            stdscr.addch(self.y + actual_h - 1, self.x, '└', pair)
+            for i in range(1, actual_w - 1):
+                stdscr.addch(self.y + actual_h - 1, self.x + i, '─', pair)
+            stdscr.addch(self.y + actual_h - 1, self.x + actual_w - 1, '┘', pair)
         except curses.error: pass
 
 class Button(Widget):
@@ -356,8 +349,8 @@ class HStack(Widget):
         return False
 
 class Frame(Box):
-    def __init__(self, title: str = "", x: int = 0, y: int = 0, width: int = 10, height: int = 5, border_char: str = '─', corner_char: str = '+', color_pair: int = 1):
-        super().__init__(x, y, width, height, border_char, corner_char, color_pair)
+    def __init__(self, title: str = "", x: int = 0, y: int = 0, width: int = 10, height: int = 5, color_pair: int = 1):
+        super().__init__(x, y, width, height, color_pair)
         self.title = title
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
