@@ -1,6 +1,7 @@
 from __future__ import annotations
 import curses
 import time
+import os
 from collections import deque
 from lokutui.events import EventDispatcher, create_key_event, _global_event_queue
 
@@ -17,6 +18,7 @@ class Screen:
         self.needs_render: bool = True
 
     def _init_curses_environment(self) -> None:
+        os.environ.setdefault('ESCDELAY', '25')
         self.stdscr = curses.initscr()
         curses.noecho()
         curses.cbreak()
