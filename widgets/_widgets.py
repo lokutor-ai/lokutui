@@ -62,7 +62,7 @@ class Box(Widget):
         except curses.error: pass
 
 class Button(Widget):
-    def __init__(self, text: str, x: int = 0, y: int = 0, on_click: callable | None = None, color_pair: int = 1, highlight_color_pair: int = 2):
+    def __init__(self, text: str, x: int = 0, y: int = 0, on_click: callable | None = None, color_pair: int = 1, highlight_color_pair: int = 3):
         super().__init__(x, y, width=len(text) + 4, height=1) 
         self._label = text
         self.on_click = on_click
@@ -228,10 +228,11 @@ class List(Widget):
             indicator = "> " if is_selected else "  "
             display_text = (indicator + str(self.items[item_idx])).ljust(actual_width)[:actual_width]
             
-            if is_selected and self.focused:
-                attr = curses.color_pair(self.highlight_color_pair) | curses.A_BOLD | curses.A_REVERSE
-            elif is_selected:
-                attr = curses.color_pair(self.color_pair) | curses.A_BOLD
+            if is_selected:
+                if self.focused:
+                    attr = curses.color_pair(self.highlight_color_pair) | curses.A_BOLD | curses.A_REVERSE
+                else:
+                    attr = curses.color_pair(self.color_pair) | curses.A_BOLD
             else:
                 attr = curses.color_pair(self.color_pair)
                 
