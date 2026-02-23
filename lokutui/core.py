@@ -17,6 +17,7 @@ class Screen:
         self.event_dispatcher = EventDispatcher()
         self._last_render_time: float = time.monotonic()
         self.needs_render: bool = True
+        self._spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
     def _init_curses_environment(self) -> None:
         os.environ.setdefault('ESCDELAY', '25')
@@ -70,13 +71,18 @@ class Screen:
             for i in range(lh):
                 try: self.stdscr.addstr(ly + i, lx, " " * lw, curses.color_pair(1))
                 except curses.error: pass
-            Frame(" SYSTEM ", lx, ly, lw, lh, color_pair=2).render(self.stdscr, max_y, max_x)
+            
+            spinner = self._spinner_frames[int(time.time() * 10) % len(self._spinner_frames)]
+            Frame(f" {spinner} SYSTEM ", lx, ly, lw, lh, color_pair=2).render(self.stdscr, max_y, max_x)
             Label(self.loading_message.center(lw - 4), lx + 2, ly + 2, width=lw - 4, color_pair=3).render(self.stdscr, max_y, max_x)
 
         if self.modal:
             self.modal.render(self.stdscr, max_y, max_x)
         self.stdscr.refresh()
         self._last_render_time = time.monotonic()
+
+    def refresh(self) -> None:
+        self.needs_render = True
 
     def run(self, initial_setup_callback: callable | None = None, main_loop_interval: float = 0.016) -> None:
         self._init_curses_environment()
@@ -103,7 +109,7 @@ class Screen:
                 if now - self._last_render_time >= main_loop_interval:
                     from lokutui.events import CustomEvent 
                     self.event_dispatcher.dispatch(CustomEvent('render_tick'))
-                    if self.needs_render or self.modal:
+                    if self.needs_render or self.modal or self.loading:
                         self._render()
                         self.needs_render = False
                     self._last_render_time = now

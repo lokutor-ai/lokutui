@@ -365,40 +365,53 @@ class Frame(Box):
         except curses.error: pass
 
 class Dialog(Widget):
-    def __init__(self, title: str, message: str, on_yes: callable, on_no: callable):
+    def __init__(self, title: str, message: str, on_yes: callable, on_no: callable | None = None):
         super().__init__()
         self.title = title
         self.message = message
         self.on_yes = on_yes
         self.on_no = on_no
-        self.yes_btn = Button("YES", on_click=on_yes)
-        self.no_btn = Button("NO", on_click=on_no)
+        self.yes_btn = Button("OK" if on_no is None else "YES", on_click=on_yes)
+        self.no_btn = Button("NO", on_click=on_no) if on_no else None
         self.yes_btn.focused = True
-        self.no_btn.focused = False
+        if self.no_btn: self.no_btn.focused = False
 
     def handle_event(self, event: object) -> bool:
         if event.type != 'key': return False
         key = event.data['code']
-        if key in [ord('\t'), curses.KEY_BTAB, ord('h'), ord('l'), curses.KEY_LEFT, curses.KEY_RIGHT]:
+        if self.no_btn and key in [ord('\t'), curses.KEY_BTAB, ord('h'), ord('l'), curses.KEY_LEFT, curses.KEY_RIGHT]:
             self.yes_btn.focused = not self.yes_btn.focused
             self.no_btn.focused = not self.no_btn.focused
             return True
         if self.yes_btn.focused and self.yes_btn.handle_event(event): return True
-        if self.no_btn.focused and self.no_btn.handle_event(event): return True
+        if self.no_btn and self.no_btn.focused and self.no_btn.handle_event(event): return True
         return True
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
-        w, h = 50, 8
+        w = int(max_x * 0.9)
+        lines = []
+        for line in str(self.message).split('\n'):
+            while len(line) > w - 8:
+                lines.append(line[:w-8])
+                line = line[w-8:]
+            lines.append(line)
+        h = max(8, len(lines) + 6)
         x, y = (max_x - w) // 2, (max_y - h) // 2
         for i in range(h):
             try: stdscr.addstr(y + i, x, " " * w, curses.color_pair(1))
             except curses.error: pass
         Frame(self.title, x, y, w, h, color_pair=4).render(stdscr, max_y, max_x)
-        Label(self.message.center(w - 4), x + 2, y + 2, width=w - 4).render(stdscr, max_y, max_x)
-        self.yes_btn.x, self.yes_btn.y = x + 10, y + 5
-        self.no_btn.x, self.no_btn.y = x + 30, y + 5
-        self.yes_btn.render(stdscr, max_y, max_x)
-        self.no_btn.render(stdscr, max_y, max_x)
+        for i, line in enumerate(lines):
+            if i + 2 < h - 2:
+                Label(line.center(w - 4), x + 2, y + 2 + i, width=w - 4).render(stdscr, max_y, max_x)
+        if self.no_btn:
+            self.yes_btn.x, self.yes_btn.y = x + w // 4 - 5, y + h - 2
+            self.no_btn.x, self.no_btn.y = x + 3 * w // 4 - 5, y + h - 2
+            self.yes_btn.render(stdscr, max_y, max_x)
+            self.no_btn.render(stdscr, max_y, max_x)
+        else:
+            self.yes_btn.x, self.yes_btn.y = x + w // 2 - 5, y + h - 2
+            self.yes_btn.render(stdscr, max_y, max_x)
 
 class FormDialog(Widget):
     def __init__(self, title: str, fields: list[tuple[str, Widget]], on_save: callable, on_cancel: callable):
@@ -412,6 +425,7 @@ class FormDialog(Widget):
         self.cancel_btn = Button("CANCEL", on_click=on_cancel)
         self.save_btn.focused = False
         self.cancel_btn.focused = False
+        self._update_focus()
 
     def handle_event(self, event: object) -> bool:
         if event.type != 'key': return False
@@ -443,7 +457,8 @@ class FormDialog(Widget):
         self.cancel_btn.focused = (self.focused_field_idx == num_fields + 1)
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
-        w, h = 70, len(self.fields) + 10
+        w = int(max_x * 0.9)
+        h = min(max_y - 2, len(self.fields) + 10)
         x, y = (max_x - w) // 2, (max_y - h) // 2
         for i in range(h):
             try: stdscr.addstr(y + i, x, " " * w, curses.color_pair(1))
@@ -454,8 +469,8 @@ class FormDialog(Widget):
             widget.x, widget.y = x + 25, y + 3 + i
             widget.width = w - 30
             widget.render(stdscr, max_y, max_x)
-        self.save_btn.x, self.save_btn.y = x + 15, y + h - 3
-        self.cancel_btn.x, self.cancel_btn.y = x + 40, y + h - 3
+        self.save_btn.x, self.save_btn.y = x + w // 4 - 5, y + h - 3
+        self.cancel_btn.x, self.cancel_btn.y = x + 3 * w // 4 - 5, y + h - 3
         self.save_btn.render(stdscr, max_y, max_x)
         self.cancel_btn.render(stdscr, max_y, max_x)
 
@@ -568,5 +583,5 @@ class Chart(Widget):
                 dots = grid[xo][yo]
                 if any(dots):
                     label = list(self.series_data.keys())[0]
-                    try: stdscr.addstr(ry + yo, rx + xo, self._get_braille_char(dots), curses.color_pair(self.color_pairs.get(label, 1)))
+                    try: stdscr.addstr(ry + yo, rx + xo, self._get_braille_char(dots), curses.color_pair(self.color_pair))
                     except curses.error: pass
