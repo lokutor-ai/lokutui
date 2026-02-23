@@ -462,14 +462,28 @@ class FormDialog(Widget):
 class LogDisplay(Widget):
     def __init__(self, x: int = 0, y: int = 0, width: int = 50, height: int = 10, color_pair: int = 1):
         super().__init__(x, y, width, height)
-        self.messages = deque(maxlen=1000) 
+        self.messages = deque(maxlen=1000)
         self.color_pair = color_pair
-        self._scroll_offset: int = 0 
+        self._scroll_offset: int = 0
         self._auto_scroll: bool = True
 
     def add_message(self, message: str) -> None:
         self.messages.append(message)
-        if self._auto_scroll: self._scroll_offset = 0 
+        if self._auto_scroll:
+            self._scroll_offset = 0
+
+    def scroll_up(self) -> None:
+        self._auto_scroll = False
+        self._scroll_offset = min(self._scroll_offset + 1, max(0, len(self.messages) - self.height))
+
+    def scroll_down(self) -> None:
+        self._scroll_offset = max(0, self._scroll_offset - 1)
+        if self._scroll_offset == 0:
+            self._auto_scroll = True
+
+    def scroll_to_end(self) -> None:
+        self._scroll_offset = 0
+        self._auto_scroll = True
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
         if not self.visible or self.width < 1 or self.height < 1:
@@ -478,14 +492,16 @@ class LogDisplay(Widget):
         render_x_start = min(self.x, max_x - 1)
         actual_height = min(self.height, max_y - render_y_start)
         actual_width = min(self.width, max_x - render_x_start)
-        start_message_idx = max(0, len(self.messages) - actual_height - self._scroll_offset)
-        end_message_idx = max(0, len(self.messages) - self._scroll_offset)
-        display_lines = list(self.messages)[start_message_idx:end_message_idx]
-        for i, line in enumerate(reversed(display_lines)):
-            y_pos = render_y_start + actual_height - 1 - i
-            if y_pos < render_y_start: break
+        total_msgs = len(self.messages)
+        start_idx = max(0, total_msgs - actual_height - self._scroll_offset)
+        end_idx = max(0, total_msgs - self._scroll_offset)
+        display_lines = list(self.messages)[start_idx:end_idx]
+        for i, line in enumerate(display_lines):
+            y_pos = render_y_start + i
+            if y_pos >= render_y_start + actual_height:
+                break
             try:
-                stdscr.addstr(y_pos, render_x_start, line[:actual_width], curses.color_pair(self.color_pair))
+                stdscr.addstr(y_pos, render_x_start, str(line)[:actual_width], curses.color_pair(self.color_pair))
             except curses.error: pass
 
 class ProgressBar(Widget):

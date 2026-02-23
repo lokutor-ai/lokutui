@@ -103,7 +103,7 @@ class Screen:
                 if now - self._last_render_time >= main_loop_interval:
                     from lokutui.events import CustomEvent 
                     self.event_dispatcher.dispatch(CustomEvent('render_tick'))
-                    if self.needs_render:
+                    if self.needs_render or self.modal:
                         self._render()
                         self.needs_render = False
                     self._last_render_time = now
