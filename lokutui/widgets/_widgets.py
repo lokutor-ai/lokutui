@@ -582,6 +582,7 @@ class Chart(Widget):
             for xo in range(aw):
                 dots = grid[xo][yo]
                 if any(dots):
-                    label = list(self.series_data.keys())[0]
-                    try: stdscr.addstr(ry + yo, rx + xo, self._get_braille_char(dots), curses.color_pair(self.color_pair))
+                    label = list(self.series_data.keys())[0] if self.series_data else ""
+                    color = self.color_pairs.get(label, 1)
+                    try: stdscr.addstr(ry + yo, rx + xo, self._get_braille_char(dots), curses.color_pair(color))
                     except curses.error: pass
