@@ -2,6 +2,7 @@ from __future__ import annotations
 from lokutui.core import Widget
 from collections import deque
 import curses
+import re
 
 class Label(Widget):
     def __init__(self, text: str, x: int = 0, y: int = 0, color_pair: int = 1, width: int | None = None, height: int = 1):
@@ -564,15 +565,23 @@ class Chart(Widget):
         if not self.visible or self.width < 1 or self.height < 1: return
         ry, rx = min(self.y, max_y - 1), min(self.x, max_x - 1)
         ah, aw = min(self.height, max_y - ry), min(self.width, max_x - rx)
+        
         for yo in range(ah):
-            try: stdscr.addstr(ry + yo, rx, self.grid_char * aw, curses.color_pair(1))
+            try: stdscr.addstr(ry + yo, rx, " " * aw, curses.color_pair(1))
             except curses.error: pass
+            
         min_v, max_v = self.y_range if self.y_range else (float('inf'), float('-inf'))
         if not self.y_range:
             for s in self.series_data.values():
                 if s: min_v, max_v = min(min_v, min(s)), max(max_v, max(s))
             if min_v == float('inf'): min_v, max_v = 0, 1 
         if max_v == min_v: max_v += 1.0
+
+        try:
+            stdscr.addstr(ry, rx, f"{max_v:.2f}", curses.color_pair(2) | curses.A_DIM)
+            stdscr.addstr(ry + ah - 1, rx, f"{min_v:.2f}", curses.color_pair(2) | curses.A_DIM)
+        except curses.error: pass
+
         grid = [[ [False] * 8 for _ in range(ah) ] for _ in range(aw)]
         for label, s in self.series_data.items():
             if not s: continue
@@ -583,6 +592,7 @@ class Chart(Widget):
                 rp = int(nv * (ah * 4 - 1))
                 ri, dy = ah - 1 - (rp // 4), 3 - (rp % 4)
                 if 0 <= ri < ah and 0 <= ci < aw: grid[ci][ri][dx * 4 + dy] = True
+        
         for yo in range(ah):
             for xo in range(aw):
                 dots = grid[xo][yo]
