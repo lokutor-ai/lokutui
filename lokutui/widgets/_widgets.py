@@ -483,9 +483,14 @@ class LogDisplay(Widget):
         self._auto_scroll: bool = True
 
     def add_message(self, message: str) -> None:
-        self.messages.append(message)
-        if self._auto_scroll:
-            self._scroll_offset = 0
+        clean_msg = str(message).split('\r')[-1]
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        clean_msg = ansi_escape.sub('', clean_msg)
+        
+        if clean_msg.strip():
+            self.messages.append(clean_msg)
+            if self._auto_scroll:
+                self._scroll_offset = 0
 
     def scroll_up(self) -> None:
         self._auto_scroll = False
