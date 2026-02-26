@@ -25,7 +25,7 @@ class Screen:
         curses.noecho()
         curses.cbreak()
         self.stdscr.keypad(True)
-        self.stdscr.nodelay(True)
+        self.stdscr.timeout(16)
         curses.curs_set(0)
         curses.start_color()
         curses.use_default_colors()
@@ -85,6 +85,7 @@ class Screen:
         self.needs_render = True
 
     def run(self, initial_setup_callback: callable | None = None, main_loop_interval: float = 0.016) -> None:
+        from lokutui.events import CustomEvent 
         self._init_curses_environment()
         try:
             if initial_setup_callback:
@@ -107,14 +108,11 @@ class Screen:
                 
                 now = time.monotonic()
                 if now - self._last_render_time >= main_loop_interval:
-                    from lokutui.events import CustomEvent 
                     self.event_dispatcher.dispatch(CustomEvent('render_tick'))
                     if self.needs_render or self.modal or self.loading:
                         self._render()
                         self.needs_render = False
                     self._last_render_time = now
-                
-                time.sleep(0.001)
         finally:
             self._destroy_curses_environment()
 
