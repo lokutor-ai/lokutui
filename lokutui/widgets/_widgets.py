@@ -43,16 +43,11 @@ class Box(Widget):
         pair = curses.color_pair(self.color_pair)
         
         try:
-            # Draw horizontal lines
             stdscr.addstr(self.y, self.x + 1, '─' * (actual_w - 2), pair)
             stdscr.addstr(self.y + actual_h - 1, self.x + 1, '─' * (actual_w - 2), pair)
-            
-            # Draw vertical lines
             for j in range(1, actual_h - 1):
                 stdscr.addstr(self.y + j, self.x, '│', pair)
                 stdscr.addstr(self.y + j, self.x + actual_w - 1, '│', pair)
-            
-            # Draw corners
             stdscr.addstr(self.y, self.x, '┌', pair)
             stdscr.addstr(self.y, self.x + actual_w - 1, '┐', pair)
             stdscr.addstr(self.y + actual_h - 1, self.x, '└', pair)
@@ -388,6 +383,7 @@ class Dialog(Widget):
         self.no_btn = Button("NO", on_click=on_no) if on_no else None
         self.yes_btn.focused = True
         if self.no_btn: self.no_btn.focused = False
+        self._cached_layout = None
 
     def handle_event(self, event: object) -> bool:
         if event.type != 'key': return False
@@ -400,7 +396,7 @@ class Dialog(Widget):
         if self.no_btn and self.no_btn.focused and self.no_btn.handle_event(event): return True
         return True
 
-    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+    def _calculate_layout(self, max_y: int, max_x: int) -> dict:
         w = int(max_x * 0.9)
         lines = []
         for line in str(self.message).split('\n'):
@@ -410,6 +406,17 @@ class Dialog(Widget):
             lines.append(line)
         h = max(8, len(lines) + 6)
         x, y = (max_x - w) // 2, (max_y - h) // 2
+        return {'x': x, 'y': y, 'w': w, 'h': h, 'lines': lines}
+
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+        if self._cached_layout is None or self._cached_layout['max_size'] != (max_y, max_x):
+            layout = self._calculate_layout(max_y, max_x)
+            layout['max_size'] = (max_y, max_x)
+            self._cached_layout = layout
+        
+        l = self._cached_layout
+        x, y, w, h, lines = l['x'], l['y'], l['w'], l['h'], l['lines']
+        
         for i in range(h):
             try: stdscr.addstr(y + i, x, " " * w, curses.color_pair(1))
             except curses.error: pass
