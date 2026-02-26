@@ -446,6 +446,7 @@ class FormDialog(Widget):
         self.save_btn.focused = False
         self.cancel_btn.focused = False
         self._update_focus()
+        self._cached_layout = None
 
     def handle_event(self, event: object) -> bool:
         if event.type != 'key': return False
@@ -476,10 +477,20 @@ class FormDialog(Widget):
         self.save_btn.focused = (self.focused_field_idx == num_fields)
         self.cancel_btn.focused = (self.focused_field_idx == num_fields + 1)
 
-    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+    def _calculate_layout(self, max_y: int, max_x: int) -> dict:
         w = int(max_x * 0.9)
         h = min(max_y - 2, len(self.fields) + 10)
         x, y = (max_x - w) // 2, (max_y - h) // 2
+        return {'x': x, 'y': y, 'w': w, 'h': h}
+
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+        if self._cached_layout is None or self._cached_layout['max_size'] != (max_y, max_x):
+            self._cached_layout = self._calculate_layout(max_y, max_x)
+            self._cached_layout['max_size'] = (max_y, max_x)
+        
+        l = self._cached_layout
+        x, y, w, h = l['x'], l['y'], l['w'], l['h']
+        
         for i in range(h):
             try: stdscr.addstr(y + i, x, " " * w, curses.color_pair(1))
             except curses.error: pass
@@ -576,7 +587,7 @@ class Chart(Widget):
         self.y_range = y_range 
         self.grid_char = '.' 
         self._cached_grid = None
-        self._last_data_hash = None
+        self._last_data_id = None
         self._last_size = (None, None)
 
     def _get_braille_char(self, points: list[bool]) -> str:
@@ -585,6 +596,12 @@ class Chart(Widget):
         for i, dot in enumerate(points):
             if dot: bitmask |= (1 << mapping[i])
         return chr(0x2800 + bitmask)
+
+    def _get_data_id(self) -> tuple:
+        ids = []
+        for label, s in self.series_data.items():
+            ids.append((label, len(s), s[-1] if s else None))
+        return tuple(ids)
 
     def render(self, stdscr: object, max_y: int, max_x: int) -> None:
         if not self.visible or self.width < 1 or self.height < 1: return
@@ -607,8 +624,8 @@ class Chart(Widget):
             stdscr.addstr(ry + ah - 1, rx, f"{min_v:.2f}", curses.color_pair(2) | curses.A_DIM)
         except curses.error: pass
 
-        data_hash = hash(str(self.series_data))
-        if self._cached_grid is None or data_hash != self._last_data_hash or (ah, aw) != self._last_size:
+        data_id = self._get_data_id()
+        if self._cached_grid is None or data_id != self._last_data_id or (ah, aw) != self._last_size:
             grid = [[ [False] * 8 for _ in range(ah) ] for _ in range(aw)]
             for label, s in self.series_data.items():
                 if not s: continue
@@ -620,7 +637,7 @@ class Chart(Widget):
                     ri, dy = ah - 1 - (rp // 4), 3 - (rp % 4)
                     if 0 <= ri < ah and 0 <= ci < aw: grid[ci][ri][dx * 4 + dy] = True
             self._cached_grid = grid
-            self._last_data_hash = data_hash
+            self._last_data_id = data_id
             self._last_size = (ah, aw)
         
         grid = self._cached_grid
