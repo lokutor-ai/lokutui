@@ -41,18 +41,22 @@ class Box(Widget):
         actual_w = end_x - self.x + 1
         if actual_w < 2 or actual_h < 2: return
         pair = curses.color_pair(self.color_pair)
+        
         try:
-            stdscr.addch(self.y, self.x, '┌', pair)
-            for i in range(1, actual_w - 1):
-                stdscr.addch(self.y, self.x + i, '─', pair)
-            stdscr.addch(self.y, self.x + actual_w - 1, '┐', pair)
+            # Draw horizontal lines
+            stdscr.addstr(self.y, self.x + 1, '─' * (actual_w - 2), pair)
+            stdscr.addstr(self.y + actual_h - 1, self.x + 1, '─' * (actual_w - 2), pair)
+            
+            # Draw vertical lines
             for j in range(1, actual_h - 1):
-                stdscr.addch(self.y + j, self.x, '│', pair)
-                stdscr.addch(self.y + j, self.x + actual_w - 1, '│', pair)
-            stdscr.addch(self.y + actual_h - 1, self.x, '└', pair)
-            for i in range(1, actual_w - 1):
-                stdscr.addch(self.y + actual_h - 1, self.x + i, '─', pair)
-            stdscr.addch(self.y + actual_h - 1, self.x + actual_w - 1, '┘', pair)
+                stdscr.addstr(self.y + j, self.x, '│', pair)
+                stdscr.addstr(self.y + j, self.x + actual_w - 1, '│', pair)
+            
+            # Draw corners
+            stdscr.addstr(self.y, self.x, '┌', pair)
+            stdscr.addstr(self.y, self.x + actual_w - 1, '┐', pair)
+            stdscr.addstr(self.y + actual_h - 1, self.x, '└', pair)
+            stdscr.addstr(self.y + actual_h - 1, self.x + actual_w - 1, '┘', pair)
         except curses.error: pass
 
 class Button(Widget):
@@ -315,14 +319,18 @@ class VStack(Widget):
         self.widgets = widgets
         self.spacing = spacing
 
-    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
-        if not self.visible:
-            return
+    def _update_child_positions(self) -> None:
         current_y = self.y
         for widget in self.widgets:
             widget.x, widget.y = self.x, current_y
-            widget.render(stdscr, max_y, max_x)
             current_y += (widget.height if widget.height is not None else 1) + self.spacing
+
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+        if not self.visible:
+            return
+        self._update_child_positions()
+        for widget in self.widgets:
+            widget.render(stdscr, max_y, max_x)
 
     def handle_event(self, event: object) -> bool:
         for widget in self.widgets:
@@ -335,14 +343,18 @@ class HStack(Widget):
         self.widgets = widgets
         self.spacing = spacing
 
-    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
-        if not self.visible:
-            return
+    def _update_child_positions(self) -> None:
         current_x = self.x
         for widget in self.widgets:
             widget.x, widget.y = current_x, self.y
-            widget.render(stdscr, max_y, max_x)
             current_x += (widget.width if widget.width is not None else 10) + self.spacing
+
+    def render(self, stdscr: object, max_y: int, max_x: int) -> None:
+        if not self.visible:
+            return
+        self._update_child_positions()
+        for widget in self.widgets:
+            widget.render(stdscr, max_y, max_x)
 
     def handle_event(self, event: object) -> bool:
         for widget in self.widgets:
@@ -516,7 +528,10 @@ class LogDisplay(Widget):
         total_msgs = len(self.messages)
         start_idx = max(0, total_msgs - actual_height - self._scroll_offset)
         end_idx = max(0, total_msgs - self._scroll_offset)
-        display_lines = list(self.messages)[start_idx:end_idx]
+        
+        from itertools import islice
+        display_lines = islice(self.messages, start_idx, end_idx)
+        
         for i, line in enumerate(display_lines):
             y_pos = render_y_start + i
             if y_pos >= render_y_start + actual_height:
@@ -553,6 +568,9 @@ class Chart(Widget):
         self.color_pairs = color_pairs if color_pairs is not None else {label: i+1 for i, label in enumerate(self.series_data.keys())}
         self.y_range = y_range 
         self.grid_char = '.' 
+        self._cached_grid = None
+        self._last_data_hash = None
+        self._last_size = (None, None)
 
     def _get_braille_char(self, points: list[bool]) -> str:
         bitmask = 0
@@ -582,17 +600,23 @@ class Chart(Widget):
             stdscr.addstr(ry + ah - 1, rx, f"{min_v:.2f}", curses.color_pair(2) | curses.A_DIM)
         except curses.error: pass
 
-        grid = [[ [False] * 8 for _ in range(ah) ] for _ in range(aw)]
-        for label, s in self.series_data.items():
-            if not s: continue
-            for cp in range(aw * 2):
-                ci, dx = cp // 2, cp % 2 
-                si = int(cp * (len(s) - 1) / (aw * 2 - 1)) if len(s) > 1 else 0
-                nv = (s[si] - min_v) / (max_v - min_v)
-                rp = int(nv * (ah * 4 - 1))
-                ri, dy = ah - 1 - (rp // 4), 3 - (rp % 4)
-                if 0 <= ri < ah and 0 <= ci < aw: grid[ci][ri][dx * 4 + dy] = True
+        data_hash = hash(str(self.series_data))
+        if self._cached_grid is None or data_hash != self._last_data_hash or (ah, aw) != self._last_size:
+            grid = [[ [False] * 8 for _ in range(ah) ] for _ in range(aw)]
+            for label, s in self.series_data.items():
+                if not s: continue
+                for cp in range(aw * 2):
+                    ci, dx = cp // 2, cp % 2 
+                    si = int(cp * (len(s) - 1) / (aw * 2 - 1)) if len(s) > 1 else 0
+                    nv = (s[si] - min_v) / (max_v - min_v)
+                    rp = int(nv * (ah * 4 - 1))
+                    ri, dy = ah - 1 - (rp // 4), 3 - (rp % 4)
+                    if 0 <= ri < ah and 0 <= ci < aw: grid[ci][ri][dx * 4 + dy] = True
+            self._cached_grid = grid
+            self._last_data_hash = data_hash
+            self._last_size = (ah, aw)
         
+        grid = self._cached_grid
         for yo in range(ah):
             for xo in range(aw):
                 dots = grid[xo][yo]
