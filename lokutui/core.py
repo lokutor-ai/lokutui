@@ -65,7 +65,6 @@ class Screen:
             widget.render(self.stdscr, max_y, max_x)
         
         if self.loading:
-            # Point 5: Using local imports but these are now handled better
             import lokutui.widgets as widgets
             lw, lh = 40, 5
             lx, ly = (max_x - lw) // 2, (max_y - lh) // 2
@@ -97,7 +96,6 @@ class Screen:
                 
                 while _global_event_queue:
                     event = _global_event_queue.popleft()
-                    # Point 2: Don't force render on every event; let handlers call refresh()
                     if event.type == 'key':
                         self.needs_render = True
                         if event.data['code'] in [ord('q'), ord('Q')]:
