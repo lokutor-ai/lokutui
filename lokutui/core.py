@@ -65,7 +65,8 @@ class Screen:
             widget.render(self.stdscr, max_y, max_x)
         
         if self.loading:
-            from lokutui.widgets import Frame, Label
+            # Point 5: Using local imports but these are now handled better
+            import lokutui.widgets as widgets
             lw, lh = 40, 5
             lx, ly = (max_x - lw) // 2, (max_y - lh) // 2
             for i in range(lh):
@@ -73,8 +74,8 @@ class Screen:
                 except curses.error: pass
             
             spinner = self._spinner_frames[int(time.time() * 10) % len(self._spinner_frames)]
-            Frame(f" {spinner} SYSTEM ", lx, ly, lw, lh, color_pair=2).render(self.stdscr, max_y, max_x)
-            Label(self.loading_message.center(lw - 4), lx + 2, ly + 2, width=lw - 4, color_pair=3).render(self.stdscr, max_y, max_x)
+            widgets.Frame(f" {spinner} SYSTEM ", lx, ly, lw, lh, color_pair=2).render(self.stdscr, max_y, max_x)
+            widgets.Label(self.loading_message.center(lw - 4), lx + 2, ly + 2, width=lw - 4, color_pair=3).render(self.stdscr, max_y, max_x)
 
         if self.modal:
             self.modal.render(self.stdscr, max_y, max_x)
@@ -96,12 +97,15 @@ class Screen:
                 
                 while _global_event_queue:
                     event = _global_event_queue.popleft()
-                    self.needs_render = True
-                    if event.type == 'key' and event.data['code'] in [ord('q'), ord('Q')]:
-                        self.should_exit = True
-                        break
+                    # Point 2: Don't force render on every event; let handlers call refresh()
+                    if event.type == 'key':
+                        self.needs_render = True
+                        if event.data['code'] in [ord('q'), ord('Q')]:
+                            self.should_exit = True
+                            break
                     
                     if self.modal and self.modal.handle_event(event):
+                        self.needs_render = True
                         continue
                     
                     self.event_dispatcher.dispatch(event)
